@@ -3,12 +3,11 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:isolate';
-import 'dart:ffi';
 import 'dart:typed_data';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
-import 'dart:developer' as dvlp;
-import 'package:wrma_com/main.dart';
+// import 'dart:developer' as dvlp;
+// import 'package:wrma_com/main.dart';
 
 enum TCPcmd {
   NONE, // normal
@@ -35,20 +34,30 @@ class TcpIpCOMMCtrl extends GetxController {
   RxList<int> pointNum = List.filled(8, 0).obs;
   Rx<int> interval = 100.obs;
   Rx<int> integration = 100.obs;
-  Rx<int> errorCode = 0.obs;
-  RxList<double> wlLow = List.filled(20, 0.00).obs;
-  RxList<double> wlHigh = List.filled(20, 0.00).obs;
-  static RxList<String> gch = RxList.empty();
-  static Rx<String> eqRcp = "EQRCP".obs;
-  static Rx<String> eqStep = "EQSTEP".obs;
-  static Rx<String> glassId = "GlassID".obs;
-  static DateTime tdata = DateTime.now();
+  RxList<double> wlLHTable = List.filled(40, 0.00).obs;
+  Rx<DateTime> tdata = DateTime.now().obs;
+  Rx<String> eqRcp = "EQRCP".obs;
+  Rx<String> eqStep = "EQSTEP".obs;
+  Rx<String> glassId = "GlassID".obs;
+  Rx<String> cmdConfirm = "0".obs;
+  Rx<String> errorConfirm = "0".obs;
+  RxList<double> wlTableMain = RxList.empty();
 
-  static List<double> nlistWaveLength = [];
-  static DateTime sndtime = DateTime.now();
-  static DateTime rcvtime = DateTime.now();
-  static TCPcmd sendOldCMD = TCPcmd.NONE;
   static TCPcmd rcvCmd = TCPcmd.NONE;
+  static int errorCode = 0;
+  static int intervalRcv = 0;
+  static DateTime getTime = DateTime.now();
+  static List<double> wlTable = [];
+  static List<double> wLLowHighTable = [];
+  static List<int> intensity = [];
+  static bool flagRcv = false;
+  static List<bool> checkflag = [false, false, false, false];
+
+  static RxList<String> gch = RxList.empty();
+  static List<double> nlistWaveLength = [];
+  static DateTime rcvtime = DateTime.now();
+  // static DateTime sndtime = DateTime.now();
+  // static TCPcmd sendOldCMD = TCPcmd.NONE;
 
   Future<void> init() async {
     TcpIpCOMMIsolateStart();
@@ -56,12 +65,12 @@ class TcpIpCOMMCtrl extends GetxController {
 
   // ignore: non_constant_identifier_names
   TcpIpCOMMIsolateStart() async {
-    ReceivePort sndPort = ReceivePort(); // isolate port
+    ReceivePort rcvPort = ReceivePort(); // isolate port
     // main => isolate로 보낼 데이터
     TcpIpCOMMhIsolateSendData data = TcpIpCOMMhIsolateSendData(
         ip: hostname,
         port: port,
-        sendPort: sndPort.sendPort, // isolate로 보낼 port
+        sendPort: rcvPort.sendPort, // isolate로 보낼 port
         data: TcpIpCOMMSendDataComponent(
           cmd: TCPcmd.NONE,
           // errorcode: errorCode.value,
@@ -77,16 +86,22 @@ class TcpIpCOMMCtrl extends GetxController {
           // checkflag: List<bool>.filled(10, false),
         ));
 
-    isolate = await Isolate.spawn(TcpIpCOMMIsolateRcv, data);
+    isolate = await Isolate.spawn(tcpIpCOMMIsolateRcv, data);
 
     // main rcv
     // isolate => main : main이 받는다
-    sndPort.listen((data) async {
+    rcvPort.listen((data) async {
+      // print("main rcv : ${data.data}");
       if (data is SendPort) {
         isoSendPort = data;
       }
 
       if (data is TcpIpCOMMIsolateReceiveData) {
+        // print("TcpIpCOMMIsolateReceiveData: ${data.data.cmd}");
+        // print("TcpIpCOMMIsolateReceiveData: ${data.data.errorcode}");
+        cmdConfirm.value = data.data.cmd.toString();
+        errorConfirm.value = data.data.errorcode.toString();
+
         switch (data.data.cmd) {
           case TCPcmd.V:
 
@@ -99,6 +114,9 @@ class TcpIpCOMMCtrl extends GetxController {
           case TCPcmd.P:
             break;
           case TCPcmd.R:
+            wlTableMain.clear();
+            data.data.wlTable?.forEach((v) => wlTableMain.add(v));
+            print("wlTableMain ${wlTableMain}");
             break;
           case TCPcmd.S:
             break;
@@ -120,14 +138,12 @@ class TcpIpCOMMCtrl extends GetxController {
         if (v == true) {
           isoSendPort?.send(TcpIpCOMMSendDataComponent(
             cmd: mainCmd.value,
-            errorcode: errorCode.value,
             eqrcp: eqRcp.value,
             eqstep: eqStep.value,
             glassid: glassId.value,
-            wLLowTable: wlLow,
-            wLHighTable: wlHigh,
+            wLLowHighTable: wlLHTable,
             pointNo: pointNum,
-            dataTime: tdata,
+            dateTime: tdata.value,
             intervalTime: interval.value,
             integrationTime: integration.value,
             checkflag: List<bool>.filled(10, false),
@@ -135,8 +151,8 @@ class TcpIpCOMMCtrl extends GetxController {
           // print("MainThread => Isolate ${mainCmd}");
           // print("interval: $ginterval");
           // print("ch: $gch");
-          print("SWLTB: $wlLow");
-          print("SWLTB: $wlHigh");
+          // print("SWLTB: $wlLow");
+          // print("SWLTB: $wlHigh");
           sendFlag(false);
         }
       },
@@ -144,7 +160,7 @@ class TcpIpCOMMCtrl extends GetxController {
   }
 
   // isolate
-  static void TcpIpCOMMIsolateRcv(TcpIpCOMMhIsolateSendData iSD) async {
+  static void tcpIpCOMMIsolateRcv(TcpIpCOMMhIsolateSendData iSD) async {
     var rcvport = ReceivePort(); // isolate 받는 포트
     iSD.sendPort.send(rcvport.sendPort); // main 이랑 isolate 연결
     final ip = iSD.ip;
@@ -167,9 +183,160 @@ class TcpIpCOMMCtrl extends GetxController {
 
       // socket listen
       socket.listen((Uint8List data) {
-        print("rcvCmd ${rcvCmd}, cmd : ${utf8.decode(data)}");
+        // ignore: avoid_print
+        // print("rcvCmd $rcvCmd, cmd : ${utf8.decode(data)}");
+        List<int> rcvbuf = []; // Data 처리용
+        // List<int> sndbuf = []; // Data 만들기용
+        // Uint8List cmds;
+        // cmds = Uint8List.fromList(rcvbuf);
+        // print("cmds, $cmds");
+        var ackNak = 0;
+        rcvbuf.clear();
+        rcvbuf.addAll(data);
+        final cmdstr = String.fromCharCode(rcvbuf[0]);
+        print("cmdstr: ${cmdstr}");
+        rcvCmd = TCPcmd.values.firstWhere(
+            (e) => e.toString() == 'TCPcmd.' + cmdstr,
+            orElse: () => TCPcmd.NONE);
+        rcvbuf.removeAt(0); // cmd 자르기
+        ackNak = rcvbuf[0];
+        rcvbuf.removeAt(0); // ack/nak 자르기
+        print("rcvCmd: ${rcvCmd}");
+        switch (rcvCmd) {
+          case TCPcmd.V:
+            // intensity data main 으로 작업 필요
+            if (ackNak == 0x06) {
+              // print("V");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.T:
+            // 완료
+            if (ackNak == 0x06) {
+              errorCode = rcvbuf[0];
+              // print("T");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.W:
+            // waveLength low high 받아야함
+            if (ackNak == 0x06) {
+              List<int> tempNum = [];
+              int length = rcvbuf[0];
+              rcvbuf.removeAt(0);
+              wLLowHighTable.clear();
+              if (length == rcvbuf.length) {
+                var buf_1 = String.fromCharCodes(rcvbuf).split(',');
+                buf_1.forEach((e) => wLLowHighTable.add(double.parse(e)));
+                buf_1.clear();
+              }
+              print("W length : ${length}");
+              print("W ${rcvbuf}");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.P:
+            // 완료
+            if (ackNak == 0x06) {
+              errorCode = rcvbuf[0];
+              // print("V");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.R:
+            if (ackNak == 0x06) {
+              List<int> tempNum = [];
+              List<int> tempLength = [];
+              tempNum.add(rcvbuf[0]);
+              tempNum.add(rcvbuf[1]);
+              Uint8List tempTotalLength = Uint8List.fromList(tempNum);
+              tempLength.add(tempTotalLength.buffer.asByteData().getInt16(0));
+              tempNum.clear();
+              rcvbuf.removeAt(0);
+              rcvbuf.removeAt(0);
+              wlTable.clear();
+
+              if (tempLength[0] == rcvbuf.length) {
+                var buf_1 = String.fromCharCodes(rcvbuf).split(',');
+                buf_1.removeLast();
+                buf_1.forEach((e) => wlTable.add(double.parse(e)));
+                // print("wlTable : ${wlTable}");
+                buf_1.clear();
+              }
+              tempLength.clear();
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.S:
+            if (ackNak == 0x06) {
+              errorCode = rcvbuf[0];
+              // print("S");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.Q:
+            if (ackNak == 0x06) {
+              errorCode = rcvbuf[0];
+              // print("Q");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.U:
+            if (ackNak == 0x06) {
+              errorCode = rcvbuf[0];
+              // print("U");
+            } else {
+              errorCode = rcvbuf[0];
+            }
+            rcvbuf.clear();
+            break;
+          case TCPcmd.NONE:
+            break;
+        }
         // 데이터 받아서 처리하는 함수
-        CommCheckValidity(rcvCmd, data);
+        // Uint8List senddata;
+        // CommCheckValidity(data);
+        // List<int> buf = [];
+        // buf.addAll(data);
+        // print("buf ${buf}");
+        // Uint8List sndbuf = Uint8List.fromList(buf);
+        // senddata = sndbuf;
+        // rcvCmd = TCPcmd.T;
+        // print("senddata ${senddata}");
+        // if (senddata.length != 0) {
+        //   socket.add(senddata);
+        // }
+        if (rcvCmd == TCPcmd.NONE) return;
+        iSD.sendPort.send(TcpIpCOMMIsolateReceiveData(
+            sendPort: rcvport.sendPort,
+            data: TcpIpCOMMReceiveDataComponent(
+              cmd: rcvCmd,
+              errorcode: errorCode,
+              interval: intervalRcv,
+              getTime: getTime,
+              wlTable: wlTable,
+              wLLowHighTable: wLLowHighTable,
+              intensity: intensity,
+              sendflag: flagRcv,
+              checkflag: checkflag,
+            )));
+        rcvCmd = TCPcmd.NONE;
+        errorCode = 0;
+        rcvbuf.clear();
         // Timer.periodic(Duration(seconds: 1), (timer) {
         //   socket.write(utf8.encode('asdf'));
         // });
@@ -179,9 +346,8 @@ class TcpIpCOMMCtrl extends GetxController {
     }
 
     // isolate rcv
-    // main => isolate : isolate가 받는다.
+    // main => isolate : isolate가 받고 Socket write
     rcvport.listen((data) async {
-      print("asd: ${data.cmd}");
       // print("isolate rcv  ${data.cmd}");
       if (data is TcpIpCOMMSendDataComponent) {
         if (data.cmd == TCPcmd.NONE) return;
@@ -193,50 +359,51 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x07]);
             String oes = "OESDATA";
             buf.addAll(oes.codeUnits);
-            print("V : ${buf}");
+            print("V : $buf");
             socket.write(buf);
             buf.clear();
             break;
           case TCPcmd.T:
             String t = "T";
             buf.addAll(t.codeUnits);
-            final length = eqRcp.value.length +
-                eqStep.value.length +
-                glassId.value.length +
-                2;
+            final int eqrcp = data.eqrcp?.length as int;
+            final int eqstep = data.eqstep?.length as int;
+            final int glassid = data.glassid?.length as int;
+            final length = eqrcp + eqstep + glassid + 2;
             buf.add(length);
-            buf.addAll(eqRcp.value.codeUnits);
+            buf.addAll(data.eqrcp.toString().codeUnits);
             buf.addAll([0x2C]);
-            buf.addAll(eqStep.value.codeUnits);
+            buf.addAll(data.eqstep.toString().codeUnits);
             buf.addAll([0x2C]);
-            buf.addAll(glassId.value.codeUnits);
+            buf.addAll(data.glassid.toString().codeUnits);
             // Uint8List sendData = Uint8List.fromList(buf);
             print("T : ${buf}");
             socket.write(buf);
             buf.clear();
             break;
           case TCPcmd.W:
-            // range작업 해야함
-            print("wLLowTable : ${data.wLLowTable?.first}");
-            print("wLHighTable : ${data.wLHighTable?.first}");
-            if (data.wLLowTable?.length != 0 && data.wLHighTable?.length != 0) {
-              print("2");
-              String w = "W";
-              buf.addAll(w.codeUnits);
-              List<double> temp = [];
-              int tempLowLegnth = 0;
-              tempLowLegnth = data.wLLowTable?.length as int;
-              int tempHighLegnth = 0;
-              tempHighLegnth = data.wLHighTable?.length as int;
-              int? commaLengh = tempLowLegnth + tempHighLegnth - 1;
-              print("3");
-              for (int i = 0; i < tempLowLegnth;) {}
-              print("a $tempLowLegnth");
-
-              print("W : ${buf}");
-              socket.write(buf);
-              temp.clear();
-            }
+            String w = "W";
+            buf.addAll(w.codeUnits);
+            // print("asdqwd : ${data.wLLowHighTable}");
+            List<String> temp = [];
+            data.wLLowHighTable?.forEach((e) {
+              temp.add(e.toString());
+              temp.add(",");
+            });
+            temp.removeLast();
+            List<int> tempbuf = [];
+            temp.forEach((e) {
+              tempbuf.addAll(e.codeUnits);
+            });
+            int? tempLength = tempbuf.length;
+            buf.add(tempLength);
+            tempbuf.forEach((e) {
+              buf.add(e);
+            });
+            print("W : ${buf}");
+            socket.write(buf);
+            temp.clear();
+            tempbuf.clear();
             buf.clear();
             break;
           case TCPcmd.P:
@@ -260,8 +427,9 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(s.codeUnits);
             buf.addAll([0x0f]);
             String patten = "yyMMddHHmmssSSS";
-            String dateTime = DateFormat(patten).format(tdata);
-            print("dateTime : ${dateTime}");
+            DateTime tempTime = data.dateTime!;
+            String dateTime = DateFormat(patten).format(tempTime);
+            // print("dateTime : ${dateTime}");
             buf.addAll(dateTime.codeUnits);
             print("S : ${buf}");
             socket.write(buf);
@@ -282,7 +450,6 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.clear();
             break;
           case TCPcmd.U:
-            // 예외처리 보완해야함
             if (data.pointNo != null && data.pointNo?.length != 0) {
               String u = "U";
               buf.addAll(u.codeUnits);
@@ -293,7 +460,7 @@ class TcpIpCOMMCtrl extends GetxController {
               });
               temp.removeLast();
               final tempLength = temp.length;
-              print("tempLength : ${tempLength}");
+              // print("tempLength : ${tempLength}");
               buf.add(tempLength);
               temp.forEach((e) {
                 buf.addAll(e.codeUnits);
@@ -301,7 +468,8 @@ class TcpIpCOMMCtrl extends GetxController {
               socket.write(buf);
               temp.clear();
             }
-            print("U : ${buf}");
+            // ignore: avoid_print
+            print("U : $buf");
             buf.clear();
             break;
           default:
@@ -314,258 +482,126 @@ class TcpIpCOMMCtrl extends GetxController {
       }
     });
 
-    debounce(readbytecnt, (v) {
-      if (readbytecnt.value <= 0) return;
-      // Uint8List data = iserialPort.read(readbytecnt.value);
-      // CommCheckValidity(sendOldCMD, data);
-
-      readbytecnt(0);
-    }, time: Duration(milliseconds: 3));
-
-    // Socket socket = await Socket.connect('10.1.0.10', 8000);
-    //
-    // print('connected');
-
-    // isolate send 필요
-    // isolate => main : main 받는다
-    // OES 에서 CMD 주는거 처리 및 reply Data 처리 후 Isolate Send!
     // debounce(readbytecnt, (v) {
     //   if (readbytecnt.value <= 0) return;
-    //   Uint8List data = iserialPort.read(readbytecnt.value);
-    //   print("serial Data Receive");
-    //   iserialPort.write(
-    //       // CommMakeReplyData(rxcmdreply(CommCheckValidity(data))),
-    //       CommMakeReplyData(CommCheckValidity(data)),
-    //       timeout: 0); // timeout: 0 = infinity
+
     //   readbytecnt(0);
-
-    //   if (ReceivedCMD.value == COMMcmd.NONE) return;
-    //   iSD.sendPort.send(SerialCOMMIsolateReceiveData(
-    //       sendPort: rcvport.sendPort,
-    //       data: SerialCOMMReceiveDataComponent(
-    //           CMD: ReceivedCMD.value,
-    //           scData: SCData,
-    //           siData: SIData,
-    //           swltbData: SWLTBData)));
-    //   print("isolate send!!");
-    //   ReceivedCMD(COMMcmd.NONE);
-    // }, time: Duration(milliseconds: 3)); // => time : 3ms Data가 짤려왔을시의 대기시간.
-
-    // Data 보내는 곳
-    // socket send
-    // add => utf8변환필요
-    // socket.write쓰면 uint8List 바로 간다.
-    // bool datasend = true;
-    // String a = "A";
-    // Uint8List b = Uint8List(3);
-    // b.add(int.parse(a));
-    // if (datasend == true) {
-    //   // socket.add(CommMakeSendData(data));
-    //   socket.write(a);
-    // }
-    // socket.write(utf8.encode('asdf'));
-
-    // Timer.periodic(Duration(seconds: 1), (timer) {
-    //   socket.write(utf8.encode('asdf'));
-    // });
-    // wait 5 seconds
-    // await Future.delayed(Duration(seconds: 5));
-
-    // .. and close the socket
-    // socket.close();
+    // }, time: Duration(milliseconds: 3));
   }
 
-  static Uint8List CommMakeSendData(TCPcmd cmd) {
-    List<int> buf = []; // Data 만들기용
-    buf.add(0x02); // stx
+  // static TCPcmdreply CommCheckValidity(Uint8List data) {
 
-    switch (cmd) {
-      case TCPcmd.T:
-        buf.addAll("STT".codeUnits);
-        buf.add(0x10); //dle
-        break;
-      case TCPcmd.P:
-        buf.addAll("STP".codeUnits);
-        buf.add(0x10); //dle
-        break;
-      case TCPcmd.R:
-        buf.addAll("GWLTB".codeUnits);
-        buf.add(0x10); //dle
-        break;
-      case TCPcmd.S:
-        buf.addAll("T".codeUnits);
-        buf.add(0x10); //dle
-        buf.addAll(DateFormat('yyyyMMddHHmmss')
-            .format(DateTime.now())
-            .toString()
-            .codeUnits);
-        break;
-      case TCPcmd.W:
-        buf.addAll("SWLTB".codeUnits);
-        buf.add(0x10); //dle
-        String s = '';
-        var cnt = 0;
-        var f = NumberFormat('0000.00');
-        // wlLow.forEach((v) {
-        //   if (v != 0) {
-        //     s += f.format(v);
-        //     s += ',';
-        //     cnt++;
-        //   }
-        // });
+  //   return TCPcmdreply.NONE;
+  // }
 
-        buf.addAll(Uint8List(2)
-          ..buffer
-              .asByteData()
-              .setInt16(0, cnt, Endian.big)); // length [high,low]
-        buf.addAll(s.codeUnits); // Data (format = [0000.00,0000.00])
-        buf.removeLast(); // Last ',' Remove
-        break;
-      case TCPcmd.Q:
-        buf.addAll("SI".codeUnits);
-        buf.add(0x10); //dle
+  // static Uint8List CommMakeReplyData(TCPcmdreply cmdtype) {
+  //   List<int> buf = []; // Data 만들기용
+  //   print('Command Reply Data : $cmdtype , CMD Type : $rcvCmd');
+  //   // switch (cmdtype) {
+  //   //   case TCPcmdreply.ACK:
+  //   //     if (receivedCMD == TCPcmd.V) {
+  //   //       // V Message 는 다른곳에서 보내는걸로
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.T) {
+  //   //       buf.addAll([0x54, 0x06, 0x00]);
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.W) {
+  //   //       // Setting Array 초기화.
+  //   //       WLLowTable.clear();
+  //   //       WLHighTable.clear();
+  //   //       if (nWLLowTable.length != nWLHighTable.length) print('이게 말이 되나???');
 
-        var f = NumberFormat('0000');
-        // buf.addAll(f.format(interval.value).codeUnits);
+  //   //       // 근사값 찾는것 시작.
+  //   //       for (var i = 0; i < nWLLowTable.length; i++) {
+  //   //         if (nWLLowTable[i] != 0.0)
+  //   //           WLLowTable.add(
+  //   //               findApproximationValue(nlistWaveTable, nWLLowTable[i]));
+  //   //         else
+  //   //           WLLowTable.add(0);
+  //   //         if (nWLHighTable[i] != 0.0)
+  //   //           WLHighTable.add(
+  //   //               findApproximationValue(nlistWaveTable, nWLHighTable[i]));
+  //   //         else
+  //   //           WLHighTable.add(0);
+  //   //       }
 
-        break;
-      case TCPcmd.U:
-        buf.addAll("SC".codeUnits);
-        buf.add(0x10); //dle
+  //   //       String ss = '';
+  //   //       // WLLow1,WLHigh1,WLLow2,WLHigh2 ... 형태의 String 으로 만들기.
+  //   //       for (var i = 0; i < WLLowTable.length; i++) {
+  //   //         ss += WLLowTable[i].toString() +
+  //   //             ',' +
+  //   //             WLHighTable[i].toString() +
+  //   //             ',';
+  //   //       }
 
-        var cnt = 0;
-        String s = '';
-        gch.forEach((v) {
-          if (v != 0) {
-            s += v.toString();
-            cnt++;
-          }
-        });
+  //   //       buf.addAll(ss.codeUnits); // send buffer 에 넣고
+  //   //       buf.removeLast(); // 마지막 ',' 삭제
+  //   //       buf.insertAll(
+  //   //           0, [0x57, 0x06, buf.length]); // cmd code , ack , length 넣기.
 
-        buf.addAll(Uint8List(1)..buffer.asByteData().setInt8(0, cnt)); // length
-        buf.addAll(s.codeUnits);
-        break;
-      default:
-    }
-    buf.add(0x03); // etx
-    Uint8List sndbuf = Uint8List.fromList(buf);
-    dvlp.log("$sndbuf");
-    return sndbuf;
-  }
+  //   //       checkflag[0] = true;
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.P) {
+  //   //       buf.addAll([0x50, 0x06, 0x00]);
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.R) {
+  //   //       nlistWaveTable.forEach((v) {
+  //   //         var s = v.toString() + ',';
+  //   //         buf.addAll(s.codeUnits);
+  //   //       });
+  //   //       buf.removeLast(); // 마지막 ',' 삭제
+  //   //       buf.insertAll(
+  //   //           0,
+  //   //           Uint8List(2)
+  //   //             ..buffer
+  //   //                 .asByteData()
+  //   //                 .setInt16(0, buf.length, Endian.big)); // length [high,low]
+  //   //       buf.insertAll(0, [0x52, 0x06]); // cmd code , ack 넣기.
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.S) {
+  //   //       buf.addAll([0x50, 0x06, 0x00]);
+  //   //       checkflag[3] = true;
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.Q) {
+  //   //       buf.addAll([0x51, 0x06, 0x00]);
+  //   //       checkflag[1] = true;
+  //   //       break;
+  //   //     } else if (receivedCMD == TCPcmd.U) {
+  //   //       buf.addAll([0x55, 0x06, 0x00]);
+  //   //       checkflag[2] = true;
+  //   //       break;
+  //   //     } else {
+  //   //       print('reply ACK else 부분!!!!');
+  //   //       break;
+  //   //     }
+  //   //   case TCPcmdreply.ERROR:
+  //   //     if (receivedCMD == TCPcmd.V)
+  //   //       buf.add(0x56);
+  //   //     else if (receivedCMD == TCPcmd.T)
+  //   //       buf.add(0x54);
+  //   //     else if (receivedCMD == TCPcmd.W)
+  //   //       buf.add(0x57);
+  //   //     else if (receivedCMD == TCPcmd.P)
+  //   //       buf.add(0x50);
+  //   //     else if (receivedCMD == TCPcmd.R)
+  //   //       buf.add(0x52);
+  //   //     else if (receivedCMD == TCPcmd.S)
+  //   //       buf.add(0x53);
+  //   //     else if (receivedCMD == TCPcmd.Q)
+  //   //       buf.add(0x51);
+  //   //     else if (receivedCMD == TCPcmd.U) buf.add(0x55);
 
-  static TCPcmdreply CommCheckValidity(TCPcmd cmd, Uint8List data) {
-    List<int> rcvbuf = []; // Data 처리용
-    List<int> sndbuf = []; // Data 만들기용
-    // Uint8List cmds;
-    // cmds = Uint8List.fromList(rcvbuf);
-    // print("cmds, $cmds");
-    rcvbuf.clear();
-    rcvbuf.addAll(data);
-    print("rcvbuf, $rcvbuf");
-    int buf = data[0];
-    switch (buf) {
-      case 0x56:
-        rcvCmd = TCPcmd.V;
-        break;
-      case 0x54:
-        rcvCmd = TCPcmd.T;
-        break;
-      case 0x57:
-        rcvCmd = TCPcmd.W;
-        break;
-      case 0x50:
-        rcvCmd = TCPcmd.P;
-        break;
-      case 0x52:
-        rcvCmd = TCPcmd.R;
-        break;
-      case 0x53:
-        rcvCmd = TCPcmd.S;
-        break;
-      case 0x51:
-        rcvCmd = TCPcmd.Q;
-        break;
-      case 0x55:
-        rcvCmd = TCPcmd.U;
-        break;
-      // case COMMcmd.NONE:
-      //   break;
-    }
+  //   //     buf.addAll([0x15, errorcode]);
+  //   //     print('reply nak message!!! $buf');
+  //   //     break;
+  //   //   case TCPcmdreply.NONE:
+  //   //     print('reply message 가 None 으로 빠졌어!!!!');
+  //   //     break;
+  //   // }
 
-    switch (rcvCmd) {
-      case TCPcmd.V:
-        try {} catch (e) {}
-        break;
-      case TCPcmd.T:
-        break;
-      case TCPcmd.W:
-        break;
-      case TCPcmd.P:
-        break;
-      case TCPcmd.Q:
-        break;
-      case TCPcmd.U:
-        if (rcvbuf[0] == 0x06) sendOldCMD = TCPcmd.NONE;
-        break;
-      case TCPcmd.R:
-        try {
-          if (rcvbuf[0] != 0x06) break; // ack check
-          rcvbuf.removeAt(0);
-
-          int length = sndbuf[0]; // take length
-          rcvbuf.removeAt(0);
-
-//length 에따른 문자열 길이 Check , ([XXXX.XX] = 7) + (length - ',')
-          if (rcvbuf.length != (7 * length) + (length - 1)) break;
-
-          String ss;
-          nlistWaveLength.clear();
-          for (int i = 0; i < length; i++) {
-            // ',' 을 찾아서 있으면 List 삭제하면서 진행 , 없으면 마지막이므로 삭제필요 X
-            if (rcvbuf.indexOf(44) != -1) {
-              ss = String.fromCharCodes(rcvbuf
-                  .take(rcvbuf.indexOf(44))); // ',' 이전 ASCII 를 가져가서 String으로 만듬
-              nlistWaveLength.add(double.parse(ss)); // String -> double
-              rcvbuf.removeRange(0, rcvbuf.indexOf(44) + 1);
-            } else {
-              ss = String.fromCharCodes(rcvbuf);
-              nlistWaveLength.add(double.parse(ss));
-            }
-            print('$nlistWaveLength');
-          }
-
-          sendOldCMD = TCPcmd.NONE;
-        } catch (e) {
-          sendOldCMD = TCPcmd.NONE;
-          return TCPcmdreply.ERROR;
-        }
-
-        break;
-      case TCPcmd.S:
-        try {
-          if (rcvbuf[0] != 0x06) break; // ack check
-          rcvbuf.removeAt(0);
-
-          var s = '';
-          rcvbuf.forEach((e) {
-            s += String.fromCharCode(e);
-          }); // ASCII -> String 변환
-
-          // yyyyMMdd + 'T' + HHmmss 형태여야 parsing 가능
-          tdata = DateTime.parse(s.substring(0, 8) + 'T' + s.substring(8));
-
-          sendOldCMD = TCPcmd.NONE;
-        } catch (e) {
-          sendOldCMD = TCPcmd.NONE;
-          return TCPcmdreply.ERROR;
-        }
-
-        break;
-      case TCPcmd.NONE:
-        break;
-    }
-    return TCPcmdreply.NONE;
-  }
+  //   Uint8List sndbuf = Uint8List.fromList(buf);
+  //   return sndbuf;
+  // }
 }
 
 class TcpIpCOMMhIsolateSendData {
@@ -587,10 +623,9 @@ class TcpIpCOMMSendDataComponent {
   String? eqrcp;
   String? eqstep;
   String? glassid;
-  List<double>? wLLowTable;
-  List<double>? wLHighTable;
+  List<double>? wLLowHighTable;
   List<int>? pointNo;
-  DateTime? dataTime;
+  DateTime? dateTime;
   int? intervalTime;
   int? integrationTime;
   List<bool>? checkflag;
@@ -600,10 +635,9 @@ class TcpIpCOMMSendDataComponent {
     this.eqrcp,
     this.eqstep,
     this.glassid,
-    this.wLLowTable,
-    this.wLHighTable,
+    this.wLLowHighTable,
     this.pointNo,
-    this.dataTime,
+    this.dateTime,
     this.intervalTime,
     this.integrationTime,
     this.checkflag,
@@ -621,18 +655,24 @@ class TcpIpCOMMIsolateReceiveData {
 
 class TcpIpCOMMReceiveDataComponent {
   TCPcmd cmd;
-  // String ip;
-  // int port;
+  int? errorcode;
   int? interval;
+  DateTime? getTime;
   List<double>? wlTable;
+  List<double>? wLLowHighTable;
+  List<int>? intensity;
+  bool? sendflag;
   List<bool>? checkflag;
 
   TcpIpCOMMReceiveDataComponent({
     required this.cmd,
-    // required this.ip,
-    // required this.port,
+    this.errorcode,
     this.interval,
+    this.getTime,
     this.wlTable,
+    this.wLLowHighTable,
+    this.intensity,
+    this.sendflag,
     this.checkflag,
   });
 }
