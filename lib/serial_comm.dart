@@ -36,9 +36,9 @@ class TcpIpCOMMCtrl extends GetxController {
   Rx<int> interval = 100.obs;
   Rx<int> integration = 100.obs;
   Rx<int> errorCode = 0.obs;
+  RxList<double> wlLow = List.filled(20, 0.00).obs;
+  RxList<double> wlHigh = List.filled(20, 0.00).obs;
   static RxList<String> gch = RxList.empty();
-  static RxList<double> wlLow = RxList.empty();
-  static RxList<double> wlHigh = RxList.empty();
   static Rx<String> eqRcp = "EQRCP".obs;
   static Rx<String> eqStep = "EQSTEP".obs;
   static Rx<String> glassId = "GlassID".obs;
@@ -135,7 +135,8 @@ class TcpIpCOMMCtrl extends GetxController {
           // print("MainThread => Isolate ${mainCmd}");
           // print("interval: $ginterval");
           // print("ch: $gch");
-          // print("SWLTB: $gSWLTB");
+          print("SWLTB: $wlLow");
+          print("SWLTB: $wlHigh");
           sendFlag(false);
         }
       },
@@ -180,6 +181,7 @@ class TcpIpCOMMCtrl extends GetxController {
     // isolate rcv
     // main => isolate : isolate가 받는다.
     rcvport.listen((data) async {
+      print("asd: ${data.cmd}");
       // print("isolate rcv  ${data.cmd}");
       if (data is TcpIpCOMMSendDataComponent) {
         if (data.cmd == TCPcmd.NONE) return;
@@ -214,11 +216,27 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.clear();
             break;
           case TCPcmd.W:
-            // 작업 해야함
-            String w = "W";
-            buf.addAll(w.codeUnits);
-            print("W : ${buf}");
-            socket.write(buf);
+            // range작업 해야함
+            print("wLLowTable : ${data.wLLowTable?.first}");
+            print("wLHighTable : ${data.wLHighTable?.first}");
+            if (data.wLLowTable?.length != 0 && data.wLHighTable?.length != 0) {
+              print("2");
+              String w = "W";
+              buf.addAll(w.codeUnits);
+              List<double> temp = [];
+              int tempLowLegnth = 0;
+              tempLowLegnth = data.wLLowTable?.length as int;
+              int tempHighLegnth = 0;
+              tempHighLegnth = data.wLHighTable?.length as int;
+              int? commaLengh = tempLowLegnth + tempHighLegnth - 1;
+              print("3");
+              for (int i = 0; i < tempLowLegnth;) {}
+              print("a $tempLowLegnth");
+
+              print("W : ${buf}");
+              socket.write(buf);
+              temp.clear();
+            }
             buf.clear();
             break;
           case TCPcmd.P:
@@ -280,13 +298,15 @@ class TcpIpCOMMCtrl extends GetxController {
               temp.forEach((e) {
                 buf.addAll(e.codeUnits);
               });
+              socket.write(buf);
+              temp.clear();
             }
             print("U : ${buf}");
-            socket.write(buf);
             buf.clear();
             break;
           default:
         }
+
         // sendData = Uint8List.fromList(buf);
         //ack 받는것 대기.
         // iserialPort.write(CommMakeSendData(data.cmd));
@@ -386,13 +406,13 @@ class TcpIpCOMMCtrl extends GetxController {
         String s = '';
         var cnt = 0;
         var f = NumberFormat('0000.00');
-        wlLow.forEach((v) {
-          if (v != 0) {
-            s += f.format(v);
-            s += ',';
-            cnt++;
-          }
-        });
+        // wlLow.forEach((v) {
+        //   if (v != 0) {
+        //     s += f.format(v);
+        //     s += ',';
+        //     cnt++;
+        //   }
+        // });
 
         buf.addAll(Uint8List(2)
           ..buffer
