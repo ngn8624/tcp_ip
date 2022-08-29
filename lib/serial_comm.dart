@@ -74,17 +74,6 @@ class TcpIpCOMMCtrl extends GetxController {
         sendPort: rcvPort.sendPort, // isolate로 보낼 port
         data: TcpIpCOMMSendDataComponent(
           cmd: TCPcmd.NONE,
-          // errorcode: errorCode.value,
-          // eqrcp: eqRcp.value,
-          // eqstep: eqStep.value,
-          // glassid: glassId.value,
-          // wLLowTable: wlLow,
-          // wLHighTable: wlHigh,
-          // pointNo: pointNum,
-          // dataTime: tdata,
-          // intervalTime: interval.value,
-          // integrationTime: integration.value,
-          // checkflag: List<bool>.filled(10, false),
         ));
 
     isolate = await Isolate.spawn(tcpIpCOMMIsolateRcv, data);
@@ -164,6 +153,7 @@ class TcpIpCOMMCtrl extends GetxController {
 
     // Server랑 연결
     Socket socket = await Socket.connect(ip, port);
+    // ignore: avoid_print
     print(
         'TCP client started connecting state : ${socket.address}:${socket.port}.');
 
@@ -275,7 +265,6 @@ class TcpIpCOMMCtrl extends GetxController {
               rcvbuf.removeAt(0);
               rcvbuf.removeAt(0);
               wlTable.clear();
-
               if (tempLength[0] == rcvbuf.length) {
                 var buf_1 = String.fromCharCodes(rcvbuf).split(',');
                 // ignore: avoid_function_literals_in_foreach_calls
@@ -338,6 +327,7 @@ class TcpIpCOMMCtrl extends GetxController {
         rcvbuf.clear();
       });
     } on SocketException catch (ex) {
+      // ignore: avoid_print
       print(ex.message);
     }
 

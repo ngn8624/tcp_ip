@@ -70,7 +70,7 @@ class MyLayout extends StatelessWidget {
                       // ignore: avoid_print, unnecessary_brace_in_string_interps
                       // print("P CLICK ${mainCMD}");
                     },
-                    child: const Text("STOP")),
+                    child: const Text("STOP : P")),
                 const SizedBox(width: 20, height: 20),
                 ElevatedButton(
                     onPressed: () {
@@ -79,7 +79,7 @@ class MyLayout extends StatelessWidget {
                       // ignore: avoid_print, unnecessary_brace_in_string_interps
                       // print("T CLICK ${mainCMD}");
                     },
-                    child: const Text("Get OES Data")),
+                    child: const Text("Get OES Data : V")),
                 const SizedBox(width: 20, height: 20),
                 ElevatedButton(
                     onPressed: () {
@@ -88,7 +88,7 @@ class MyLayout extends StatelessWidget {
                       // ignore: avoid_print, unnecessary_brace_in_string_interps
                       // print("R CLICK ${mainCMD}");
                     },
-                    child: const Text("All Wl Data Request")),
+                    child: const Text("All Wl Data Request : R")),
                 const SizedBox(width: 20, height: 20),
                 ElevatedButton(
                     onPressed: () {
@@ -98,7 +98,7 @@ class MyLayout extends StatelessWidget {
                       // ignore: avoid_print, unnecessary_brace_in_string_interps
                       // print("S CLICK ${mainCMD}");
                     },
-                    child: const Text("Time Sync")),
+                    child: const Text("Time Sync : S")),
               ],
             ),
             const SizedBox(width: 20, height: 20),
@@ -146,7 +146,7 @@ class MyLayout extends StatelessWidget {
                     // ignore: avoid_print, unnecessary_brace_in_string_interps
                     // print("T CLICK ${mainCMD}");
                   },
-                  child: const Text("Process START")),
+                  child: const Text("Process START : T")),
             ]),
             const SizedBox(width: 20, height: 20),
             Row(
@@ -205,7 +205,7 @@ class MyLayout extends StatelessWidget {
                       // ignore: avoid_print, unnecessary_brace_in_string_interps
                       // print("U CLICK ${mainCMD}");
                     },
-                    child: const Text("Channel Setting")),
+                    child: const Text("Channel Setting : U")),
               ],
             ),
             const SizedBox(width: 20, height: 20),
@@ -247,7 +247,7 @@ class MyLayout extends StatelessWidget {
                       // print("Q CLICK ${mainCMD}");
                       if (intervalTemp.isNotEmpty) intervalTemp.clear();
                     },
-                    child: const Text("Interval, Integration Setting")),
+                    child: const Text("Interval, Integration Setting : Q")),
               ],
             ),
             const SizedBox(width: 20, height: 20),
@@ -296,7 +296,7 @@ class MyLayout extends StatelessWidget {
                     if (wlTemp.isNotEmpty) wlTemp.clear();
                     sendFlag(true);
                   },
-                  child: const Text("WL Setting")),
+                  child: const Text("WL Setting : W")),
             ]),
             const SizedBox(width: 20, height: 20),
             const Divider(),
