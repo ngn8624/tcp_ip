@@ -346,6 +346,7 @@ class TcpIpCOMMCtrl extends GetxController {
             String oes = "OESDATA";
             buf.addAll(oes.codeUnits);
             socket.write(buf);
+            print("V : ${buf}");
             buf.clear();
             break;
           case TCPcmd.T:
@@ -362,6 +363,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x2C]);
             buf.addAll(data.glassid.toString().codeUnits);
             socket.write(buf);
+            print("T : ${buf}");
             buf.clear();
             break;
           case TCPcmd.W:
@@ -391,6 +393,7 @@ class TcpIpCOMMCtrl extends GetxController {
             });
             socket.write(buf);
             tempbuf.clear();
+            print("W : ${buf}");
             buf.clear();
             break;
           case TCPcmd.P:
@@ -398,6 +401,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(p.codeUnits);
             buf.addAll([0x00]);
             socket.write(buf);
+            print("P : ${buf}");
             buf.clear();
             break;
           case TCPcmd.R:
@@ -405,6 +409,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(r.codeUnits);
             buf.addAll([0x00]);
             socket.write(buf);
+            print("R : ${buf}");
             buf.clear();
             break;
           case TCPcmd.S:
@@ -416,6 +421,7 @@ class TcpIpCOMMCtrl extends GetxController {
             String dateTime = DateFormat(patten).format(tempTime);
             buf.addAll(dateTime.codeUnits);
             socket.write(buf);
+            print("S : ${buf}");
             buf.clear();
             break;
           case TCPcmd.Q:
@@ -429,6 +435,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x2C]);
             buf.addAll(sendIntegration.codeUnits);
             socket.write(buf);
+            print("Q : ${buf}");
             buf.clear();
             break;
           case TCPcmd.U:

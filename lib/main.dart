@@ -1,19 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:ffi';
 import 'package:get/get.dart';
 import 'package:wrma_com/serial_comm.dart';
-
+import 'package:window_manager/window_manager.dart';
 // ignore: non_constant_identifier_names
 
-DateTime sndtime = DateTime.now();
-DateTime rcvtime = DateTime.now();
-
-final DynamicLibrary wgsFunction = DynamicLibrary.open("WGSFunction.dll");
-late int Function(int a) serialConnect;
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+
   Get.put(TcpIpCOMMCtrl());
   TcpIpCOMMCtrl.to.init();
+
+  windowManager.waitUntilReadyToShow().then((_) async {
+    await windowManager.setTitleBarStyle(
+      TitleBarStyle.normal,
+      windowButtonVisibility: false,
+    );
+    await windowManager.setSize(const Size(1920, 1020));
+    await windowManager.setMinimumSize(const Size(1920, 1020));
+    await windowManager.center();
+    await windowManager.focus();
+    await windowManager.show();
+    await windowManager.setPreventClose(true);
+    await windowManager.setSkipTaskbar(false);
+  });
 
   runApp(MyApp());
 }
@@ -67,8 +78,6 @@ class MyLayout extends StatelessWidget {
                     onPressed: () {
                       mainCMD.value = TCPcmd.P;
                       sendFlag(true);
-                      // ignore: avoid_print, unnecessary_brace_in_string_interps
-                      // print("P CLICK ${mainCMD}");
                     },
                     child: const Text("STOP : P")),
                 const SizedBox(width: 20, height: 20),
@@ -76,8 +85,6 @@ class MyLayout extends StatelessWidget {
                     onPressed: () {
                       mainCMD.value = TCPcmd.V;
                       sendFlag(true);
-                      // ignore: avoid_print, unnecessary_brace_in_string_interps
-                      // print("T CLICK ${mainCMD}");
                     },
                     child: const Text("Get OES Data : V")),
                 const SizedBox(width: 20, height: 20),
@@ -85,8 +92,6 @@ class MyLayout extends StatelessWidget {
                     onPressed: () {
                       mainCMD.value = TCPcmd.R;
                       sendFlag(true);
-                      // ignore: avoid_print, unnecessary_brace_in_string_interps
-                      // print("R CLICK ${mainCMD}");
                     },
                     child: const Text("All Wl Data Request : R")),
                 const SizedBox(width: 20, height: 20),
@@ -95,8 +100,6 @@ class MyLayout extends StatelessWidget {
                       mainCMD.value = TCPcmd.S;
                       TcpIpCOMMCtrl.to.tdata.value = DateTime.now();
                       sendFlag(true);
-                      // ignore: avoid_print, unnecessary_brace_in_string_interps
-                      // print("S CLICK ${mainCMD}");
                     },
                     child: const Text("Time Sync : S")),
               ],
@@ -115,7 +118,7 @@ class MyLayout extends StatelessWidget {
                   textAlign: TextAlign.end,
                   // ignore: prefer_const_constructors
                   decoration: InputDecoration(
-                    labelText: "RcP Name, StepName, GlassID",
+                    labelText: "RCP Name, StepName, GlassID",
                     labelStyle: const TextStyle(fontSize: 12),
                   ),
                   onChanged: (v) {
@@ -124,7 +127,6 @@ class MyLayout extends StatelessWidget {
                     if (idlTemp.last == "") {
                       idlTemp.removeLast();
                     }
-                    // print("glassid ${glassid.value}, v : $v");
                   },
                   inputFormatters: [
                     LengthLimitingTextInputFormatter(50),
@@ -142,9 +144,6 @@ class MyLayout extends StatelessWidget {
                       glassid.value = idlTemp[2];
                       sendFlag(true);
                     }
-                    idlTemp.clear();
-                    // ignore: avoid_print, unnecessary_brace_in_string_interps
-                    // print("T CLICK ${mainCMD}");
                   },
                   child: const Text("Process START : T")),
             ]),
@@ -181,14 +180,14 @@ class MyLayout extends StatelessWidget {
                     onPressed: () {
                       mainCMD.value = TCPcmd.U;
                       if (channelTemp.isEmpty) return;
+                      if (channelTemp.length > 8) return;
                       pointNum.clear();
                       if (channelTemp.length == 8) {
                         // ignore: avoid_function_literals_in_foreach_calls
                         channelTemp.forEach((e) {
                           pointNum.add(int.parse(e));
                         });
-                        channelTemp.clear();
-                      } else if (channelTemp.length < 8) {
+                      } else {
                         // ignore: avoid_function_literals_in_foreach_calls
                         channelTemp.forEach((e) {
                           pointNum.add(int.parse(e));
@@ -196,14 +195,8 @@ class MyLayout extends StatelessWidget {
                         for (int i = 0; i < 8 - channelTemp.length; i++) {
                           pointNum.add(int.parse("0"));
                         }
-                        channelTemp.clear();
-                      } else {
-                        channelTemp.clear();
-                        return;
                       }
                       sendFlag(true);
-                      // ignore: avoid_print, unnecessary_brace_in_string_interps
-                      // print("U CLICK ${mainCMD}");
                     },
                     child: const Text("Channel Setting : U")),
               ],
@@ -242,10 +235,8 @@ class MyLayout extends StatelessWidget {
                       if (intervalTemp.length == 2) {
                         ginterval.value = int.parse(intervalTemp[0]);
                         gintegration.value = int.parse(intervalTemp[1]);
-                        sendFlag(true);
                       }
-                      // print("Q CLICK ${mainCMD}");
-                      if (intervalTemp.isNotEmpty) intervalTemp.clear();
+                      sendFlag(true);
                     },
                     child: const Text("Interval, Integration Setting : Q")),
               ],
@@ -285,15 +276,17 @@ class MyLayout extends StatelessWidget {
                   onPressed: () {
                     mainCMD.value = TCPcmd.W;
                     gwlLHTable.clear();
+                    // print("wlTemp.length : ${wlTemp.length}");
+                    // if (wlTemp.length != 40) return;
                     for (int i = 0; i < wlTemp.length; i++) {
                       gwlLHTable.add(double.parse(wlTemp[i]));
                     }
-                    if (gwlLHTable.length != 40) {
-                      for (int i = 0; i < 40 - wlTemp.length; i++) {
-                        gwlLHTable.add(double.parse("0.0"));
-                      }
-                    }
-                    if (wlTemp.isNotEmpty) wlTemp.clear();
+                    // print("gwlLHTable : ${gwlLHTable}");
+                    // if (gwlLHTable.length != 40) {
+                    //   for (int i = 0; i < 40 - wlTemp.length; i++) {
+                    //     gwlLHTable.add(double.parse("0.0"));
+                    //   }
+                    // }
                     sendFlag(true);
                   },
                   child: const Text("WL Setting : W")),
