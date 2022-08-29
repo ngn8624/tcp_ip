@@ -180,14 +180,16 @@ class MyLayout extends StatelessWidget {
                 ElevatedButton(
                     onPressed: () {
                       mainCMD.value = TCPcmd.U;
-                      if (channelTemp.length == 0) return;
+                      if (channelTemp.isEmpty) return;
                       pointNum.clear();
                       if (channelTemp.length == 8) {
+                        // ignore: avoid_function_literals_in_foreach_calls
                         channelTemp.forEach((e) {
                           pointNum.add(int.parse(e));
                         });
                         channelTemp.clear();
                       } else if (channelTemp.length < 8) {
+                        // ignore: avoid_function_literals_in_foreach_calls
                         channelTemp.forEach((e) {
                           pointNum.add(int.parse(e));
                         });
@@ -297,9 +299,12 @@ class MyLayout extends StatelessWidget {
                   child: const Text("WL Setting")),
             ]),
             const SizedBox(width: 20, height: 20),
+            const Divider(),
+            // ignore: prefer_const_literals_to_create_immutables
+            Row(children: [
+              const Text("Respond"),
+            ]),
             const SizedBox(width: 20, height: 20),
-            Divider(),
-            Text("Respond"),
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
@@ -312,15 +317,14 @@ class MyLayout extends StatelessWidget {
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
-                Text("Wl Table ${TcpIpCOMMCtrl.to.wlTableMain.value}"),
+                Text("Wl Table ${TcpIpCOMMCtrl.to.wlTableMain}"),
               ],
             ),
             const SizedBox(width: 20, height: 20),
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
-                Text(
-                    "Wl LowHight ${TcpIpCOMMCtrl.to.wLLowHighTableMain.value}"),
+                Text("Wl LowHight ${TcpIpCOMMCtrl.to.wLLowHighTableMain}"),
               ],
             ),
             const SizedBox(width: 20, height: 20),
@@ -341,8 +345,7 @@ class MyLayout extends StatelessWidget {
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
-                Text(
-                    "받아온 Intensity :  ${TcpIpCOMMCtrl.to.intensityMain.value}"),
+                Text("받아온 Intensity :  ${TcpIpCOMMCtrl.to.intensityMain}"),
               ],
             ),
           ],
