@@ -276,17 +276,14 @@ class MyLayout extends StatelessWidget {
                   onPressed: () {
                     mainCMD.value = TCPcmd.W;
                     gwlLHTable.clear();
-                    // print("wlTemp.length : ${wlTemp.length}");
-                    // if (wlTemp.length != 40) return;
                     for (int i = 0; i < wlTemp.length; i++) {
                       gwlLHTable.add(double.parse(wlTemp[i]));
                     }
-                    // print("gwlLHTable : ${gwlLHTable}");
-                    // if (gwlLHTable.length != 40) {
-                    //   for (int i = 0; i < 40 - wlTemp.length; i++) {
-                    //     gwlLHTable.add(double.parse("0.0"));
-                    //   }
-                    // }
+                    if (gwlLHTable.length != 40) {
+                      for (int i = 0; i < 40 - wlTemp.length; i++) {
+                        gwlLHTable.add(double.parse("0.0"));
+                      }
+                    }
                     sendFlag(true);
                   },
                   child: const Text("WL Setting : W")),
@@ -310,14 +307,14 @@ class MyLayout extends StatelessWidget {
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
-                Text("Wl Table ${TcpIpCOMMCtrl.to.wlTableMain}"),
+                Text("All WL Table ${TcpIpCOMMCtrl.to.wlTableMain}"),
               ],
             ),
             const SizedBox(width: 20, height: 20),
             Row(
               children: [
                 const SizedBox(width: 20, height: 20),
-                Text("Wl LowHight ${TcpIpCOMMCtrl.to.wLLowHighTableMain}"),
+                Text("Range Low Hight ${TcpIpCOMMCtrl.to.wLLowHighTableMain}"),
               ],
             ),
             const SizedBox(width: 20, height: 20),
