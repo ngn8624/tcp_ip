@@ -42,6 +42,10 @@ class TcpIpCOMMCtrl extends GetxController {
   Rx<String> cmdConfirm = "0".obs;
   Rx<String> errorConfirm = "0".obs;
   RxList<double> wlTableMain = RxList.empty();
+  RxList<double> wLLowHighTableMain = RxList.empty();
+  RxList<int> intensityMain = RxList.empty();
+  Rx<DateTime> getTimeMain = DateTime.now().obs;
+  Rx<int> getChannelMain = 0.obs;
 
   static TCPcmd rcvCmd = TCPcmd.NONE;
   static int errorCode = 0;
@@ -51,6 +55,7 @@ class TcpIpCOMMCtrl extends GetxController {
   static List<double> wLLowHighTable = [];
   static List<int> intensity = [];
   static bool flagRcv = false;
+  static int channelNumber = 0;
   static List<bool> checkflag = [false, false, false, false];
 
   static RxList<String> gch = RxList.empty();
@@ -104,19 +109,24 @@ class TcpIpCOMMCtrl extends GetxController {
 
         switch (data.data.cmd) {
           case TCPcmd.V:
-
-            /// main 작동 함수
+            intensityMain.clear();
+            getTimeMain.value = data.data.getTime!;
+            getChannelMain.value = data.data.channelnum!;
+            data.data.intensity?.forEach((e) => intensityMain.add(e));
             break;
           case TCPcmd.T:
             break;
           case TCPcmd.W:
+            wLLowHighTableMain.clear();
+            data.data.wLLowHighTable?.forEach((e) => wLLowHighTableMain.add(e));
+            // print("wLLowHighTableMain ${wLLowHighTableMain}");
             break;
           case TCPcmd.P:
             break;
           case TCPcmd.R:
             wlTableMain.clear();
             data.data.wlTable?.forEach((v) => wlTableMain.add(v));
-            print("wlTableMain ${wlTableMain}");
+            //print("wlTableMain ${wlTableMain}");
             break;
           case TCPcmd.S:
             break;
@@ -194,18 +204,66 @@ class TcpIpCOMMCtrl extends GetxController {
         rcvbuf.clear();
         rcvbuf.addAll(data);
         final cmdstr = String.fromCharCode(rcvbuf[0]);
-        print("cmdstr: ${cmdstr}");
+        // print("cmdstr: ${cmdstr}");
         rcvCmd = TCPcmd.values.firstWhere(
             (e) => e.toString() == 'TCPcmd.' + cmdstr,
             orElse: () => TCPcmd.NONE);
         rcvbuf.removeAt(0); // cmd 자르기
         ackNak = rcvbuf[0];
         rcvbuf.removeAt(0); // ack/nak 자르기
-        print("rcvCmd: ${rcvCmd}");
+        // print("rcvCmd: ${rcvCmd}");
         switch (rcvCmd) {
           case TCPcmd.V:
             // intensity data main 으로 작업 필요
             if (ackNak == 0x06) {
+              int tempLength = rcvbuf[0];
+              rcvbuf.removeAt(0); // length 지우기
+              // List<String> tempbuf = String.fromCharCodes(rcvbuf).split(',');
+              // print("tempbuf : ${tempbuf}");
+              // getTime = DateTime.parse('20' +
+              //     tempbuf[0].substring(0, 6) +
+              //     'T' +
+              //     tempbuf[0].substring(6, 12) +
+              //     '.' +
+              //     tempbuf[0].substring(12));
+              // tempbuf.removeAt(0); // tempbuf의 날짜 지우기
+              // tempbuf.removeAt(0); // tempbuf의 channel num 지우기
+              // for (int i = 0; i < 16; i++) {
+              //   rcvbuf.removeAt(0); // 날짜 지우기
+              // }
+              // channelNumber = rcvbuf[0];
+              // rcvbuf.removeAt(0); // channel num 지우기
+              // intensity.clear();
+              // tempbuf.forEach((e) => intensity.add(int.parse(e)));
+              // print("rcvbuf : ${rcvbuf}");
+              // print("tempbuf : ${tempbuf}");
+              // print("intensity : ${intensity}");
+              // print("channelNumber : ${channelNumber}");
+              // tempbuf.clear();
+              if (tempLength == rcvbuf.length) {
+                List<String> tempbuf = String.fromCharCodes(rcvbuf).split(',');
+                print("tempbuf : ${tempbuf}");
+                getTime = DateTime.parse('20' +
+                    tempbuf[0].substring(0, 6) +
+                    'T' +
+                    tempbuf[0].substring(6, 12) +
+                    '.' +
+                    tempbuf[0].substring(12));
+                tempbuf.removeAt(0); // tempbuf의 날짜 지우기
+                tempbuf.removeAt(0); // tempbuf의 channel num 지우기
+                for (int i = 0; i < 16; i++) {
+                  rcvbuf.removeAt(0); // 날짜 지우기
+                }
+                channelNumber = rcvbuf[0];
+                rcvbuf.removeAt(0); // channel num 지우기
+                intensity.clear();
+                tempbuf.forEach((e) => intensity.add(int.parse(e)));
+                print("rcvbuf : ${rcvbuf}");
+                print("tempbuf : ${tempbuf}");
+                print("intensity : ${intensity}");
+                print("channelNumber : ${channelNumber}");
+                tempbuf.clear();
+              }
               // print("V");
             } else {
               errorCode = rcvbuf[0];
@@ -226,15 +284,25 @@ class TcpIpCOMMCtrl extends GetxController {
             // waveLength low high 받아야함
             if (ackNak == 0x06) {
               List<int> tempNum = [];
-              int length = rcvbuf[0];
+              List<int> tempLength = [];
+              tempNum.add(rcvbuf[0]);
+              tempNum.add(rcvbuf[1]);
+              Uint8List tempTotalLength = Uint8List.fromList(tempNum);
+              tempLength.add(tempTotalLength.buffer.asByteData().getInt16(0));
+              tempNum.clear();
+              rcvbuf.removeAt(0);
               rcvbuf.removeAt(0);
               wLLowHighTable.clear();
-              if (length == rcvbuf.length) {
+              // var buf_1 = String.fromCharCodes(rcvbuf).split(',');
+              // buf_1.forEach((e) => wLLowHighTable.add(double.parse(e)));
+              // buf_1.clear();
+
+              if (tempLength[0] == rcvbuf.length) {
                 var buf_1 = String.fromCharCodes(rcvbuf).split(',');
                 buf_1.forEach((e) => wLLowHighTable.add(double.parse(e)));
                 buf_1.clear();
               }
-              print("W length : ${length}");
+              tempLength.clear();
               print("W ${rcvbuf}");
             } else {
               errorCode = rcvbuf[0];
@@ -266,9 +334,7 @@ class TcpIpCOMMCtrl extends GetxController {
 
               if (tempLength[0] == rcvbuf.length) {
                 var buf_1 = String.fromCharCodes(rcvbuf).split(',');
-                buf_1.removeLast();
                 buf_1.forEach((e) => wlTable.add(double.parse(e)));
-                // print("wlTable : ${wlTable}");
                 buf_1.clear();
               }
               tempLength.clear();
@@ -327,6 +393,7 @@ class TcpIpCOMMCtrl extends GetxController {
               cmd: rcvCmd,
               errorcode: errorCode,
               interval: intervalRcv,
+              channelnum: channelNumber,
               getTime: getTime,
               wlTable: wlTable,
               wLLowHighTable: wLLowHighTable,
@@ -395,14 +462,18 @@ class TcpIpCOMMCtrl extends GetxController {
             temp.forEach((e) {
               tempbuf.addAll(e.codeUnits);
             });
-            int? tempLength = tempbuf.length;
-            buf.add(tempLength);
+            temp.clear();
+            buf.insertAll(
+                1,
+                Uint8List(2)
+                  ..buffer
+                      .asByteData()
+                      .setInt16(0, tempbuf.length, Endian.big));
             tempbuf.forEach((e) {
               buf.add(e);
             });
             print("W : ${buf}");
             socket.write(buf);
-            temp.clear();
             tempbuf.clear();
             buf.clear();
             break;
@@ -429,8 +500,8 @@ class TcpIpCOMMCtrl extends GetxController {
             String patten = "yyMMddHHmmssSSS";
             DateTime tempTime = data.dateTime!;
             String dateTime = DateFormat(patten).format(tempTime);
-            // print("dateTime : ${dateTime}");
             buf.addAll(dateTime.codeUnits);
+            // print("dateTime : ${dateTime}");
             print("S : ${buf}");
             socket.write(buf);
             buf.clear();
@@ -657,6 +728,7 @@ class TcpIpCOMMReceiveDataComponent {
   TCPcmd cmd;
   int? errorcode;
   int? interval;
+  int? channelnum;
   DateTime? getTime;
   List<double>? wlTable;
   List<double>? wLLowHighTable;
@@ -668,6 +740,7 @@ class TcpIpCOMMReceiveDataComponent {
     required this.cmd,
     this.errorcode,
     this.interval,
+    this.channelnum,
     this.getTime,
     this.wlTable,
     this.wLLowHighTable,
