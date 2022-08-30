@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:typed_data';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:get/get.dart';
 import 'package:intl/intl.dart';
 
@@ -44,6 +45,10 @@ class TcpIpCOMMCtrl extends GetxController {
   RxList<int> intensityMain = RxList.empty();
   Rx<DateTime> getTimeMain = DateTime.now().obs;
   Rx<int> getChannelMain = 0.obs;
+  RxList<List<List<FlSpot>>> fullSeries = RxList.empty();
+
+  final RxList<FlSpot> z = RxList.empty();
+  RxList<double> xInterval = RxList.empty();
 
   static TCPcmd rcvCmd = TCPcmd.NONE;
   static int errorCode = 0;
@@ -61,6 +66,17 @@ class TcpIpCOMMCtrl extends GetxController {
   static DateTime rcvtime = DateTime.now();
 
   Future<void> init() async {
+    for (var i = 0; i < 8; i++) {
+      xInterval.add(0.1);
+    }
+    fullSeries.clear();
+    for (var i = 0; i < 8; i++) {
+      fullSeries.add([]);
+      for (var j = 0; j < 20; j++) {
+        fullSeries[i].add([]);
+        fullSeries[i][j].add(const FlSpot(0, 0));
+      }
+    }
     TcpIpCOMMIsolateStart();
   }
 
@@ -76,12 +92,11 @@ class TcpIpCOMMCtrl extends GetxController {
           cmd: TCPcmd.NONE,
         ));
 
-    isolate = await Isolate.spawn(tcpIpCOMMIsolateRcv, data);
+    isolate = await Isolate.spawn(tcpIpCOMMIsolate, data);
 
     // main rcv
     // isolate => main : main이 받는다
     rcvPort.listen((data) async {
-      // print("main rcv : ${data.data}");
       if (data is SendPort) {
         isoSendPort = data;
       }
@@ -95,6 +110,16 @@ class TcpIpCOMMCtrl extends GetxController {
             getTimeMain.value = data.data.getTime!;
             getChannelMain.value = data.data.channelnum!;
             data.data.intensity?.forEach((e) => intensityMain.add(e));
+            final List<FlSpot> tempSpots = [];
+            for (var k = 0; k < intensityMain.length; k++) {
+              tempSpots.add(FlSpot(xInterval[getChannelMain.value - 1],
+                  double.parse(intensityMain[k].toString())));
+            }
+            xInterval[getChannelMain.value - 1] += 0.1;
+            for (var k = 0; k < tempSpots.length; k++) {
+              fullSeries[getChannelMain.value - 1][k].add(tempSpots[k]);
+            }
+            fullSeries.refresh();
             break;
           case TCPcmd.T:
             break;
@@ -145,7 +170,7 @@ class TcpIpCOMMCtrl extends GetxController {
   }
 
   // isolate
-  static void tcpIpCOMMIsolateRcv(TcpIpCOMMhIsolateSendData iSD) async {
+  static void tcpIpCOMMIsolate(TcpIpCOMMhIsolateSendData iSD) async {
     var rcvport = ReceivePort(); // isolate 받는 포트
     iSD.sendPort.send(rcvport.sendPort); // main 이랑 isolate 연결
     final ip = iSD.ip;
@@ -153,6 +178,7 @@ class TcpIpCOMMCtrl extends GetxController {
 
     // Server랑 연결
     Socket socket = await Socket.connect(ip, port);
+    // ServerSocket socket2 = ;
     // ignore: avoid_print
     print(
         'TCP client started connecting state : ${socket.address}:${socket.port}.');
@@ -162,7 +188,6 @@ class TcpIpCOMMCtrl extends GetxController {
 
       // socket listen
       socket.listen((Uint8List data) {
-        // ignore: avoid_print
         List<int> rcvbuf = []; // Data 처리용
         var ackNak = 0;
         rcvbuf.clear();
@@ -182,7 +207,6 @@ class TcpIpCOMMCtrl extends GetxController {
               rcvbuf.removeAt(0); // length 지우기
               if (tempLength == rcvbuf.length) {
                 List<String> tempbuf = String.fromCharCodes(rcvbuf).split(',');
-                // print("tempbuf : ${tempbuf}");
                 // ignore: prefer_interpolation_to_compose_strings
                 getTime = DateTime.parse('20' +
                     tempbuf[0].substring(0, 6) +
@@ -202,7 +226,6 @@ class TcpIpCOMMCtrl extends GetxController {
                 tempbuf.forEach((e) => intensity.add(int.parse(e)));
                 tempbuf.clear();
               }
-              // print("V");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -212,7 +235,6 @@ class TcpIpCOMMCtrl extends GetxController {
             // 완료
             if (ackNak == 0x06) {
               errorCode = rcvbuf[0];
-              // print("T");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -247,7 +269,6 @@ class TcpIpCOMMCtrl extends GetxController {
             // 완료
             if (ackNak == 0x06) {
               errorCode = rcvbuf[0];
-              // print("V");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -280,7 +301,6 @@ class TcpIpCOMMCtrl extends GetxController {
           case TCPcmd.S:
             if (ackNak == 0x06) {
               errorCode = rcvbuf[0];
-              // print("S");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -289,7 +309,6 @@ class TcpIpCOMMCtrl extends GetxController {
           case TCPcmd.Q:
             if (ackNak == 0x06) {
               errorCode = rcvbuf[0];
-              // print("Q");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -298,7 +317,6 @@ class TcpIpCOMMCtrl extends GetxController {
           case TCPcmd.U:
             if (ackNak == 0x06) {
               errorCode = rcvbuf[0];
-              // print("U");
             } else {
               errorCode = rcvbuf[0];
             }
@@ -325,6 +343,10 @@ class TcpIpCOMMCtrl extends GetxController {
         rcvCmd = TCPcmd.NONE;
         errorCode = 0;
         rcvbuf.clear();
+      }, onError: (error) {
+        // ignore: avoid_print
+        print(error);
+        socket.destroy();
       });
     } on SocketException catch (ex) {
       // ignore: avoid_print
@@ -334,7 +356,6 @@ class TcpIpCOMMCtrl extends GetxController {
     // isolate rcv
     // main => isolate : isolate가 받고 Socket write
     rcvport.listen((data) async {
-      // print("isolate rcv  ${data.cmd}");
       if (data is TcpIpCOMMSendDataComponent) {
         if (data.cmd == TCPcmd.NONE) return;
         List<int> buf = [];
@@ -346,7 +367,7 @@ class TcpIpCOMMCtrl extends GetxController {
             String oes = "OESDATA";
             buf.addAll(oes.codeUnits);
             socket.write(buf);
-            print("V : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.T:
@@ -363,7 +384,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x2C]);
             buf.addAll(data.glassid.toString().codeUnits);
             socket.write(buf);
-            print("T : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.W:
@@ -393,7 +414,7 @@ class TcpIpCOMMCtrl extends GetxController {
             });
             socket.write(buf);
             tempbuf.clear();
-            print("W : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.P:
@@ -401,7 +422,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(p.codeUnits);
             buf.addAll([0x00]);
             socket.write(buf);
-            print("P : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.R:
@@ -409,7 +430,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(r.codeUnits);
             buf.addAll([0x00]);
             socket.write(buf);
-            print("R : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.S:
@@ -421,7 +442,7 @@ class TcpIpCOMMCtrl extends GetxController {
             String dateTime = DateFormat(patten).format(tempTime);
             buf.addAll(dateTime.codeUnits);
             socket.write(buf);
-            print("S : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.Q:
@@ -435,7 +456,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x2C]);
             buf.addAll(sendIntegration.codeUnits);
             socket.write(buf);
-            print("Q : ${buf}");
+
             buf.clear();
             break;
           case TCPcmd.U:
@@ -450,7 +471,7 @@ class TcpIpCOMMCtrl extends GetxController {
               });
               temp.removeLast();
               final tempLength = temp.length;
-              // print("tempLength : ${tempLength}");
+
               buf.add(tempLength);
               // ignore: avoid_function_literals_in_foreach_calls
               temp.forEach((e) {
@@ -459,8 +480,6 @@ class TcpIpCOMMCtrl extends GetxController {
               socket.write(buf);
               temp.clear();
             }
-            // ignore: avoid_print
-            print("U : $buf");
             buf.clear();
             break;
           default:
