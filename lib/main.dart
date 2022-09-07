@@ -17,14 +17,14 @@ void main() async {
   windowManager.waitUntilReadyToShow().then((_) async {
     await windowManager.setTitleBarStyle(
       TitleBarStyle.normal,
-      windowButtonVisibility: false,
+      windowButtonVisibility: true,
     );
     await windowManager.setSize(const Size(1920, 1020));
     await windowManager.setMinimumSize(const Size(1920, 1020));
     await windowManager.center();
     await windowManager.focus();
     await windowManager.show();
-    await windowManager.setPreventClose(true);
+    await windowManager.setPreventClose(false);
     await windowManager.setSkipTaskbar(false);
   });
 
@@ -61,12 +61,12 @@ class MyLayout extends StatefulWidget {
 class _MyLayout extends State<MyLayout> {
   TextEditingController idT =
       TextEditingController(text: "EQRCP,EQSTEP,GlassID");
-  TextEditingController chU = TextEditingController(text: "1,2,3,4,0,1,2,3");
+  TextEditingController chU = TextEditingController(text: "1,2,3,4,5,6,7,8");
   TextEditingController intervalIntegrarionQ =
-      TextEditingController(text: "1000,1000");
+      TextEditingController(text: "200,100");
   TextEditingController lowHighW = TextEditingController(
       text:
-          "162.06,162.42,162.79,163.15,163.52,163.89,164.25,164.62,164.98,165.35,165.72,166.08,166.45,166.82,167.18,167.55,167.92,168.28,168.65,169.02,169.38,169.75,170.12,170.48,170.85,171.22,171.59,171.95,172.32,172.69,173.06,173.42,173.79,174.16,174.52,174.89,175.26,175.63,176.56,176.36");
+          "162.06,170.42,162.79,180.15,163.52,180.89,164.25,190.62,164.98,200.35,165.72,210.08,166.45,230.82,167.18,240.55,167.92,250.28,168.65,260.02,169.38,270.75,170.12,280.48,170.85,290.22,171.59,300.95,172.32,310.69,173.06,320.42,173.79,330.16,174.52,340.89,175.26,350.63,176.56,400.36");
   @override
   Widget build(BuildContext context) {
     final sendFlag = TcpIpCOMMCtrl.to.sendFlag;
@@ -525,6 +525,7 @@ class ChartSample extends StatelessWidget {
         rt.add(
           LineChartBarData(
             spots: TcpIpCOMMCtrl.to.fullSeries[index][i],
+            // color: ,
             barWidth: 1,
             dotData: FlDotData(
               show: false,

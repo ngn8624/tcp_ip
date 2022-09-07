@@ -26,7 +26,7 @@ class TcpIpCOMMCtrl extends GetxController {
   static TcpIpCOMMCtrl get to => Get.find();
   late Isolate isolate;
   SendPort? isoSendPort;
-  String hostname = '192.168.1.6';
+  String hostname = '10.1.0.10';
   int port = 8000;
   Rx<TCPcmd> mainCmd = TCPcmd.NONE.obs;
   RxBool sendFlag = false.obs;
@@ -178,7 +178,6 @@ class TcpIpCOMMCtrl extends GetxController {
 
     // Server랑 연결
     Socket socket = await Socket.connect(ip, port);
-    // ServerSocket socket2 = ;
     // ignore: avoid_print
     print(
         'TCP client started connecting state : ${socket.address}:${socket.port}.');
@@ -188,6 +187,7 @@ class TcpIpCOMMCtrl extends GetxController {
 
       // socket listen
       socket.listen((Uint8List data) {
+        print("data : ${data}");
         List<int> rcvbuf = []; // Data 처리용
         var ackNak = 0;
         rcvbuf.clear();
@@ -215,11 +215,11 @@ class TcpIpCOMMCtrl extends GetxController {
                     '.' +
                     tempbuf[0].substring(12));
                 tempbuf.removeAt(0); // tempbuf의 날짜 지우기
+                channelNumber = int.parse(tempbuf[0]);
                 tempbuf.removeAt(0); // tempbuf의 channel num 지우기
                 for (int i = 0; i < 16; i++) {
                   rcvbuf.removeAt(0); // 날짜 지우기
                 }
-                channelNumber = rcvbuf[0];
                 rcvbuf.removeAt(0); // channel num 지우기
                 intensity.clear();
                 // ignore: avoid_function_literals_in_foreach_calls
@@ -366,7 +366,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll([0x07]);
             String oes = "OESDATA";
             buf.addAll(oes.codeUnits);
-            socket.write(buf);
+            socket.add(buf);
 
             buf.clear();
             break;
@@ -383,7 +383,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(data.eqstep.toString().codeUnits);
             buf.addAll([0x2C]);
             buf.addAll(data.glassid.toString().codeUnits);
-            socket.write(buf);
+            socket.add(buf);
 
             buf.clear();
             break;
@@ -412,16 +412,15 @@ class TcpIpCOMMCtrl extends GetxController {
             tempbuf.forEach((e) {
               buf.add(e);
             });
-            socket.write(buf);
+            socket.add(buf);
             tempbuf.clear();
-
             buf.clear();
             break;
           case TCPcmd.P:
             String p = "P";
             buf.addAll(p.codeUnits);
             buf.addAll([0x00]);
-            socket.write(buf);
+            socket.add(buf);
 
             buf.clear();
             break;
@@ -429,8 +428,7 @@ class TcpIpCOMMCtrl extends GetxController {
             String r = "R";
             buf.addAll(r.codeUnits);
             buf.addAll([0x00]);
-            socket.write(buf);
-
+            socket.add(buf);
             buf.clear();
             break;
           case TCPcmd.S:
@@ -441,8 +439,7 @@ class TcpIpCOMMCtrl extends GetxController {
             DateTime tempTime = data.dateTime!;
             String dateTime = DateFormat(patten).format(tempTime);
             buf.addAll(dateTime.codeUnits);
-            socket.write(buf);
-
+            socket.add(buf);
             buf.clear();
             break;
           case TCPcmd.Q:
@@ -455,7 +452,7 @@ class TcpIpCOMMCtrl extends GetxController {
             buf.addAll(sendInterval.codeUnits);
             buf.addAll([0x2C]);
             buf.addAll(sendIntegration.codeUnits);
-            socket.write(buf);
+            socket.add(buf);
 
             buf.clear();
             break;
@@ -477,7 +474,7 @@ class TcpIpCOMMCtrl extends GetxController {
               temp.forEach((e) {
                 buf.addAll(e.codeUnits);
               });
-              socket.write(buf);
+              socket.add(buf);
               temp.clear();
             }
             buf.clear();
